@@ -1,3 +1,10 @@
+#!/bin/bash
+
+# Set environment variables for Streamlit Cloud
+export DEMO_MODE=true
+export IS_STREAMLIT_CLOUD=true
+
+# Create Streamlit configuration directories
 mkdir -p ~/.streamlit/
 
 echo "\

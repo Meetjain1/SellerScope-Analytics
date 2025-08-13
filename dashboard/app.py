@@ -230,35 +230,52 @@ def get_database_connection():
     Returns:
         DatabaseConnector: An active database connection object
     """
-    # Get database connection parameters from environment variables or use defaults
-    import os
-    db_params = {
-        'dbname': os.environ.get('DB_NAME', 'seller_analytics'),
-        'user': os.environ.get('DB_USER', 'postgres'),
-        'password': os.environ.get('DB_PASSWORD', 'postgres'),
-        'host': os.environ.get('DB_HOST', 'localhost'),
-        'port': int(os.environ.get('DB_PORT', '5432'))
-    }
+    # Import configuration settings
+    try:
+        from config import DB_CONFIG, DEMO_MODE, IS_STREAMLIT_CLOUD
+        db_params = DB_CONFIG
+        demo_mode = DEMO_MODE
+    except ImportError:
+        # Fallback if config import fails
+        import os
+        db_params = {
+            'dbname': os.environ.get('DB_NAME', 'seller_analytics'),
+            'user': os.environ.get('DB_USER', 'postgres'),
+            'password': os.environ.get('DB_PASSWORD', 'postgres'),
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'port': int(os.environ.get('DB_PORT', '5432'))
+        }
+        demo_mode = os.environ.get('DEMO_MODE', 'false').lower() == 'true'
+        IS_STREAMLIT_CLOUD = os.environ.get('IS_STREAMLIT_CLOUD') or 'STREAMLIT_SHARING' in os.environ
     
-    # Check for DEMO_MODE environment variable
-    import os
-    demo_mode = os.environ.get('DEMO_MODE', 'false').lower() == 'true'
+    # Force demo mode in Streamlit Cloud environment
+    if IS_STREAMLIT_CLOUD:
+        demo_mode = True
+        st.sidebar.info("Running on Streamlit Cloud in demo mode")
     
-    # Use DemoDataProvider in demo mode or when database connection fails
+    # Use DemoDataProvider in demo mode (or always for Streamlit Cloud)
     if demo_mode:
-        from scripts.demo_data_provider import DemoDataProvider
-        st.sidebar.success("Running in demo mode with sample data")
-        return DemoDataProvider()
+        try:
+            from scripts.demo_data_provider import DemoDataProvider
+            st.sidebar.success("Running in demo mode with sample data")
+            return DemoDataProvider()
+        except Exception as demo_error:
+            st.error(f"Failed to initialize demo data: {str(demo_error)}")
+            st.stop()
     
-    # Try to connect to the database
+    # Only try database connection if not in demo mode
     try:
         db = DatabaseConnector(db_params)
         connection_successful = db.connect()
         
         if not connection_successful:
             st.warning("Failed to connect to the database. Falling back to demo mode with sample data.")
-            from scripts.demo_data_provider import DemoDataProvider
-            return DemoDataProvider()
+            try:
+                from scripts.demo_data_provider import DemoDataProvider
+                return DemoDataProvider()
+            except Exception as demo_error:
+                st.error(f"Failed to initialize demo data after database connection failed: {str(demo_error)}")
+                st.stop()
         else:
             # Log success for debugging
             st.sidebar.success("Database connection established successfully")
@@ -270,7 +287,7 @@ def get_database_connection():
             from scripts.demo_data_provider import DemoDataProvider
             return DemoDataProvider()
         except Exception as demo_error:
-            st.error(f"Failed to initialize demo data: {str(demo_error)}")
+            st.error(f"Failed to initialize demo data after database exception: {str(demo_error)}")
             st.stop()
 
 # Load data with caching
@@ -987,6 +1004,14 @@ def display_seller_breakdown(seller_breakdown):
             else:
                 st.info("No return data available for this seller.")
 
+# Import the DemoDataProvider for type checking
+try:
+    from scripts.demo_data_provider import DemoDataProvider
+except ImportError:
+    # Define a dummy class for type checking if import fails
+    class DemoDataProvider:
+        pass
+
 # Main function
 def main():
     # Initialize database connection
@@ -997,8 +1022,17 @@ def main():
     # Store debug mode in session state for other parts of the app to access
     st.session_state['debug_mode'] = debug_mode
     
+    # Check if we're using the demo data provider
+    is_demo = isinstance(db, DemoDataProvider)
+    if is_demo:
+        st.session_state['is_demo_mode'] = True
+    
     # Load initial data
-    initial_data = load_initial_data(_db=db)
+    try:
+        initial_data = load_initial_data(_db=db)
+    except Exception as e:
+        st.error(f"Error loading initial data: {str(e)}")
+        st.stop()
     
     # Display debug information if requested
     if debug_mode:
@@ -1007,6 +1041,7 @@ def main():
         st.sidebar.write("Locations type:", type(initial_data['locations']))
         st.sidebar.write("Categories type:", type(initial_data['categories']))
         st.sidebar.write("Sellers type:", type(initial_data['sellers']))
+        st.sidebar.write("Using demo mode:", st.session_state.get('is_demo_mode', False))
     
     # Title and description
     st.markdown('''
