@@ -240,24 +240,29 @@ def get_database_connection():
     Returns:
         DatabaseConnector or str: An active database connection object or "demo_mode"
     """
+    # Check if we're forcing demo mode (for cloud deployment)
+    if os.environ.get("DEMO_MODE") == "true":
+        st.info("Running in demo mode with sample data.")
+        return "demo_mode"
+    
     # Try to get database parameters from Streamlit secrets first
     try:
-        db_params = {
-            'dbname': st.secrets.get("database", {}).get("dbname", "seller_analytics"),
-            'user': st.secrets.get("database", {}).get("user", "postgres"),
-            'password': st.secrets.get("database", {}).get("password", "postgres"),
-            'host': st.secrets.get("database", {}).get("host", "localhost"),
-            'port': st.secrets.get("database", {}).get("port", 5432)
-        }
-    except:
-        # Fallback to default values for local development
-        db_params = {
-            'dbname': 'seller_analytics',
-            'user': 'postgres',
-            'password': 'postgres',
-            'host': 'localhost',
-            'port': 5432
-        }
+        if hasattr(st, 'secrets') and "database" in st.secrets:
+            db_params = {
+                'dbname': st.secrets["database"].get("dbname", "seller_analytics"),
+                'user': st.secrets["database"].get("user", "postgres"),
+                'password': st.secrets["database"].get("password", "postgres"),
+                'host': st.secrets["database"].get("host", "localhost"),
+                'port': st.secrets["database"].get("port", 5432)
+            }
+        else:
+            # No secrets found, go directly to demo mode
+            st.info("No database configuration found. Running in demo mode with sample data.")
+            return "demo_mode"
+    except Exception:
+        # If there's any issue with secrets, go to demo mode
+        st.info("No database configuration found. Running in demo mode with sample data.")
+        return "demo_mode"
     
     # Try to connect to the database
     try:
@@ -271,13 +276,13 @@ def get_database_connection():
             # Test the connection by running a simple query
             try:
                 test_result = db.get_date_range()
-                if test_result.empty:
+                if test_result is None or test_result.empty:
                     st.warning("Database connected but no data found. Running in demo mode with sample data.")
                     return "demo_mode"
                 st.sidebar.success("Database connection established successfully")
                 return db
             except Exception as test_error:
-                st.warning(f"Database connection test failed: {str(test_error)}. Running in demo mode with sample data.")
+                st.warning(f"Database query failed: {str(test_error)}. Running in demo mode with sample data.")
                 return "demo_mode"
     except Exception as e:
         st.warning(f"Database connection failed: {str(e)}. Running in demo mode with sample data.")
@@ -317,9 +322,11 @@ def load_initial_data(_db):
                 'sellers': _db.get_all_sellers()
             }
             
-            # Check if any data is empty and fallback to demo mode
-            if (data['date_range'].empty or data['locations'].empty or 
-                data['categories'].empty or data['sellers'].empty):
+            # Check if any data is empty or None and fallback to demo mode
+            if (data['date_range'] is None or data['date_range'].empty or 
+                data['locations'] is None or data['locations'].empty or 
+                data['categories'] is None or data['categories'].empty or 
+                data['sellers'] is None or data['sellers'].empty):
                 st.warning("Database returned empty data. Using demo data instead.")
                 data = {
                     'date_range': demo_data.get_demo_date_range(),
@@ -368,9 +375,17 @@ def load_kpi_data(_db, filters=None):
         
         return kpi_data
     else:
-        # Use real database data
-        filter_str = str(sorted((filters or {}).items())) + str(datetime.now().minute)
-        return _db.get_seller_kpi_dashboard(filters)
+        # Use real database data with error handling
+        try:
+            filter_str = str(sorted((filters or {}).items())) + str(datetime.now().minute)
+            result = _db.get_seller_kpi_dashboard(filters)
+            if result is None or result.empty:
+                st.warning("No KPI data available from database. Using demo data.")
+                return demo_data.generate_demo_kpi_data()
+            return result
+        except Exception as e:
+            st.warning(f"Error loading KPI data: {str(e)}. Using demo data.")
+            return demo_data.generate_demo_kpi_data()
 
 # Load top sellers data with filters
 @st.cache_data(ttl=3600, show_spinner=False)
