@@ -20,18 +20,18 @@ np.random.seed(42)
 random.seed(42)
 
 def generate_demo_sellers():
-    """Generate demo seller data"""
+    """Generate demo seller data with Indian context"""
     sellers = [
-        {"seller_id": 1, "seller_name": "TechHub Electronics", "seller_location": "New York", "category_specialization": "Electronics"},
-        {"seller_id": 2, "seller_name": "Fashion Forward", "seller_location": "California", "category_specialization": "Clothing"},
-        {"seller_id": 3, "seller_name": "Home Comfort Store", "seller_location": "Texas", "category_specialization": "Home & Garden"},
-        {"seller_id": 4, "seller_name": "Sports Galaxy", "seller_location": "Florida", "category_specialization": "Sports & Outdoors"},
-        {"seller_id": 5, "seller_name": "Book Haven", "seller_location": "Washington", "category_specialization": "Books"},
-        {"seller_id": 6, "seller_name": "Beauty Boutique", "seller_location": "Illinois", "category_specialization": "Health & Beauty"},
-        {"seller_id": 7, "seller_name": "Auto Parts Pro", "seller_location": "Michigan", "category_specialization": "Automotive"},
-        {"seller_id": 8, "seller_name": "Pet Paradise", "seller_location": "Colorado", "category_specialization": "Pet Supplies"},
-        {"seller_id": 9, "seller_name": "Kitchen Masters", "seller_location": "Oregon", "category_specialization": "Kitchen & Dining"},
-        {"seller_id": 10, "seller_name": "Toy Universe", "seller_location": "Nevada", "category_specialization": "Toys & Games"},
+        {"seller_id": 1, "seller_name": "Mumbai Electronics Hub", "seller_location": "Mumbai", "category_specialization": "Electronics"},
+        {"seller_id": 2, "seller_name": "Delhi Fashion Store", "seller_location": "Delhi", "category_specialization": "Clothing"},
+        {"seller_id": 3, "seller_name": "Bangalore Home Decor", "seller_location": "Bangalore", "category_specialization": "Home & Garden"},
+        {"seller_id": 4, "seller_name": "Chennai Sports Corner", "seller_location": "Chennai", "category_specialization": "Sports & Outdoors"},
+        {"seller_id": 5, "seller_name": "Kolkata Book Palace", "seller_location": "Kolkata", "category_specialization": "Books"},
+        {"seller_id": 6, "seller_name": "Pune Beauty Bazaar", "seller_location": "Pune", "category_specialization": "Health & Beauty"},
+        {"seller_id": 7, "seller_name": "Hyderabad Auto Parts", "seller_location": "Hyderabad", "category_specialization": "Automotive"},
+        {"seller_id": 8, "seller_name": "Ahmedabad Pet Store", "seller_location": "Ahmedabad", "category_specialization": "Pet Supplies"},
+        {"seller_id": 9, "seller_name": "Jaipur Kitchen World", "seller_location": "Jaipur", "category_specialization": "Kitchen & Dining"},
+        {"seller_id": 10, "seller_name": "Lucknow Toy Junction", "seller_location": "Lucknow", "category_specialization": "Toys & Games"},
     ]
     return pd.DataFrame(sellers)
 
@@ -41,9 +41,9 @@ def generate_demo_kpi_data():
     
     kpi_data = []
     for _, seller in sellers.iterrows():
-        # Generate realistic metrics based on seller type
-        base_orders = random.randint(500, 2000)
-        base_revenue = base_orders * random.uniform(25, 150)
+        # Generate realistic metrics based on seller type and Indian market context
+        base_orders = random.randint(300, 1500)  # Adjusted for Indian market scale
+        base_revenue = base_orders * random.uniform(800, 4500)  # In INR (₹20-120 per order avg)
         
         kpi_data.append({
             "seller_id": seller["seller_id"],
@@ -53,11 +53,11 @@ def generate_demo_kpi_data():
             "total_revenue": base_revenue,
             "average_order_value": base_revenue / base_orders,
             "average_rating": round(random.uniform(3.5, 4.8), 2),
-            "total_review_count": random.randint(100, 800),
-            "return_rate": round(random.uniform(2, 15), 2),
-            "cancellation_rate": round(random.uniform(1, 8), 2),
+            "total_review_count": random.randint(80, 600),
+            "return_rate": round(random.uniform(2, 12), 2),  # Slightly lower return rates in India
+            "cancellation_rate": round(random.uniform(1, 6), 2),
             "ontime_delivery_rate": round(random.uniform(85, 98), 2),
-            "negative_review_count": random.randint(5, 50)
+            "negative_review_count": random.randint(3, 35)
         })
     
     return pd.DataFrame(kpi_data)
@@ -77,9 +77,9 @@ def generate_demo_monthly_trend():
         month_str = current_date.strftime("%Y-%m")
         
         for _, seller in sellers.iterrows():
-            # Add seasonality and randomness
-            base_revenue = random.uniform(10000, 50000)
-            seasonal_factor = 1.2 if current_date.month in [11, 12, 1] else 1.0  # Holiday season boost
+            # Add seasonality and randomness - Indian market context
+            base_revenue = random.uniform(25000, 150000)  # Monthly revenue in INR
+            seasonal_factor = 1.3 if current_date.month in [10, 11, 12] else 1.0  # Diwali/festive season boost
             monthly_revenue = base_revenue * seasonal_factor * random.uniform(0.8, 1.3)
             
             monthly_data.append({
@@ -87,7 +87,7 @@ def generate_demo_monthly_trend():
                 "seller_name": seller["seller_name"],
                 "month": month_str,
                 "monthly_revenue": monthly_revenue,
-                "total_orders": int(monthly_revenue / random.uniform(30, 80))
+                "total_orders": int(monthly_revenue / random.uniform(800, 2500))  # Average order value in INR
             })
         
         # Move to next month
@@ -99,11 +99,11 @@ def generate_demo_monthly_trend():
     return pd.DataFrame(monthly_data)
 
 def generate_demo_order_status():
-    """Generate demo order status distribution"""
+    """Generate demo order status distribution for Indian e-commerce"""
     status_data = [
-        {"order_status": "delivered", "order_count": 8500},
-        {"order_status": "cancelled", "order_count": 450},
-        {"order_status": "returned", "order_count": 350},
+        {"order_status": "delivered", "order_count": 7800},  # Slightly lower delivery rate
+        {"order_status": "cancelled", "order_count": 650},   # Higher cancellation in India
+        {"order_status": "returned", "order_count": 280},    # Lower return rate
     ]
     return pd.DataFrame(status_data)
 
@@ -123,8 +123,8 @@ def generate_demo_ratings_returns():
             "seller_id": seller["seller_id"],
             "average_rating": rating,
             "return_rate": return_rate,
-            "total_orders": random.randint(300, 1500),
-            "total_revenue": random.uniform(15000, 120000)
+            "total_orders": random.randint(250, 1200),
+            "total_revenue": random.uniform(50000, 400000)  # Revenue in INR
         })
     
     return pd.DataFrame(correlation_data)
@@ -136,9 +136,9 @@ def get_demo_date_range():
     return pd.DataFrame([{"min_date": start_date, "max_date": end_date}])
 
 def get_demo_locations():
-    """Generate demo locations"""
-    locations = ["New York", "California", "Texas", "Florida", "Washington", 
-                "Illinois", "Michigan", "Colorado", "Oregon", "Nevada"]
+    """Generate demo locations with Indian cities"""
+    locations = ["Mumbai", "Delhi", "Bangalore", "Chennai", "Kolkata", 
+                "Pune", "Hyderabad", "Ahmedabad", "Jaipur", "Lucknow"]
     return pd.DataFrame({"seller_location": locations})
 
 def get_demo_categories():
@@ -164,18 +164,18 @@ def generate_demo_seller_breakdown(seller_id):
     trend_data = generate_demo_monthly_trend()
     seller_trend = trend_data[trend_data["seller_id"] == seller_id].to_dict('records')
     
-    # Category data
-    categories = ["Electronics", "Accessories", "Components"]
+    # Category data - Indian e-commerce context
+    categories = ["Electronics", "Mobile Accessories", "Computer Components"]
     category_data = []
     total_revenue = seller_kpi["total_revenue"]
     
     for i, category in enumerate(categories):
-        percentage = random.uniform(20, 40) if i == 0 else random.uniform(10, 30)
+        percentage = random.uniform(25, 45) if i == 0 else random.uniform(15, 35)
         category_revenue = total_revenue * (percentage / 100)
         category_data.append({
             "product_category": category,
             "category_revenue": category_revenue,
-            "order_count": int(category_revenue / random.uniform(40, 80)),
+            "order_count": int(category_revenue / random.uniform(1200, 2800)),  # INR per order
             "percentage": percentage
         })
     
@@ -195,12 +195,13 @@ def generate_demo_seller_breakdown(seller_id):
         {"rating_score": 1, "rating_count": int(seller_kpi["total_review_count"] * 0.02)},
     ]
     
-    # Return data
+    # Return data - Indian e-commerce return reasons
     return_data = [
-        {"return_reason": "Damaged Item", "return_count": random.randint(10, 50)},
-        {"return_reason": "Wrong Size", "return_count": random.randint(5, 30)},
-        {"return_reason": "Not as Described", "return_count": random.randint(3, 20)},
-        {"return_reason": "Changed Mind", "return_count": random.randint(2, 15)},
+        {"return_reason": "Product Damaged", "return_count": random.randint(8, 40)},
+        {"return_reason": "Wrong Product Delivered", "return_count": random.randint(5, 25)},
+        {"return_reason": "Quality Issues", "return_count": random.randint(4, 20)},
+        {"return_reason": "Not as Described", "return_count": random.randint(3, 15)},
+        {"return_reason": "Size/Fit Issues", "return_count": random.randint(2, 12)},
     ]
     
     return {

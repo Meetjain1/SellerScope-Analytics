@@ -625,7 +625,7 @@ def display_kpi_metrics(kpi_data, filters=None):
     with col2:
         st.markdown(f'''
             <div class="metric-card" id="revenue-metric-{metrics_key}">
-                <div class="metric-value">${total_revenue:,.2f}</div>
+                <div class="metric-value">₹{total_revenue:,.2f}</div>
                 <div class="metric-label">Total Revenue</div>
             </div>
         ''', unsafe_allow_html=True)
@@ -633,7 +633,7 @@ def display_kpi_metrics(kpi_data, filters=None):
     with col3:
         st.markdown(f'''
             <div class="metric-card" id="aov-metric-{metrics_key}">
-                <div class="metric-value">${avg_order_value:.2f}</div>
+                <div class="metric-value">₹{avg_order_value:.2f}</div>
                 <div class="metric-label">Avg. Order Value</div>
             </div>
         ''', unsafe_allow_html=True)
@@ -667,7 +667,7 @@ def display_top_sellers_chart(top_sellers):
         y='seller_name',
         x='total_revenue',
         title='Top 10 Sellers by Revenue',
-        labels={'seller_name': 'Seller', 'total_revenue': 'Total Revenue ($)'},
+        labels={'seller_name': 'Seller', 'total_revenue': 'Total Revenue (₹)'},
         color='total_revenue',
         color_continuous_scale='Viridis',
         orientation='h',
@@ -684,7 +684,7 @@ def display_top_sellers_chart(top_sellers):
     # Update layout
     # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
     fig.update_layout(
-        xaxis_title='Total Revenue ($)',
+        xaxis_title='Total Revenue (₹)',
         yaxis_title='',
         yaxis=dict(autorange="reversed"),  # Highest revenue at the top
         coloraxis_showscale=False
@@ -714,7 +714,7 @@ def display_monthly_trend_chart(monthly_trend):
             x='month',
             y=monthly_pivot.columns[1:],  # Skip the 'month' column
             title='Monthly Sales Trend by Seller',
-            labels={'value': 'Revenue ($)', 'variable': 'Seller'},
+            labels={'value': 'Revenue (₹)', 'variable': 'Seller'},
             height=500
         )
     else:
@@ -762,7 +762,7 @@ def display_monthly_trend_chart(monthly_trend):
         )
         
         # Update y-axes
-        fig.update_yaxes(title_text='Revenue ($)', secondary_y=False)
+        fig.update_yaxes(title_text='Revenue (₹)', secondary_y=False)
         fig.update_yaxes(title_text='Number of Orders', secondary_y=True)
     
     st.plotly_chart(fig, use_container_width=True)
@@ -831,7 +831,7 @@ def display_ratings_returns_chart(ratings_returns):
             'average_rating': 'Average Rating (1-5)',
             'return_rate': 'Return Rate (%)',
             'total_orders': 'Total Orders',
-            'total_revenue': 'Total Revenue ($)'
+            'total_revenue': 'Total Revenue (₹)'
         },
         height=600
     )
@@ -895,8 +895,8 @@ def display_seller_breakdown(seller_breakdown):
         st.subheader("Performance Summary")
         kpi_data = seller_breakdown['kpi_data']
         st.write(f"**Total Orders:** {kpi_data.get('total_orders', 0):,.0f}")
-        st.write(f"**Total Revenue:** ${kpi_data.get('total_revenue', 0):,.2f}")
-        st.write(f"**Average Order Value:** ${kpi_data.get('average_order_value', 0):,.2f}")
+        st.write(f"**Total Revenue:** ₹{kpi_data.get('total_revenue', 0):,.2f}")
+        st.write(f"**Average Order Value:** ₹{kpi_data.get('average_order_value', 0):,.2f}")
         st.write(f"**Average Rating:** {kpi_data.get('average_rating', 0):.2f}/5 ({kpi_data.get('total_review_count', 0)} reviews)")
     
     with col3:
@@ -952,7 +952,7 @@ def display_seller_breakdown(seller_breakdown):
             
             # Update y-axes
             # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
-            fig.update_yaxes(title_text='Revenue ($)', secondary_y=False)
+            fig.update_yaxes(title_text='Revenue (₹)', secondary_y=False)
             fig.update_yaxes(title_text='Number of Orders', secondary_y=True)
             
             st.plotly_chart(fig, use_container_width=True)
@@ -984,7 +984,7 @@ def display_seller_breakdown(seller_breakdown):
             
             # Update layout
             fig.update_layout(
-                xaxis_title='Revenue ($)',
+                xaxis_title='Revenue (₹)',
                 yaxis_title='',
                 yaxis=dict(autorange="reversed")  # Highest revenue at the top
             )
@@ -1101,7 +1101,7 @@ def main():
     st.markdown('''
         <div class="title-container">
             <h1>📊 Seller Performance Analytics Dashboard</h1>
-            <p>Analyze seller performance metrics and generate actionable insights for your e-commerce marketplace.</p>
+            <p>Analyze seller performance metrics and generate actionable insights for your Indian e-commerce marketplace.</p>
         </div>
     ''', unsafe_allow_html=True)
     
