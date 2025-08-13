@@ -42,6 +42,14 @@ from datetime import datetime, timedelta
 from io import BytesIO
 import importlib.util
 
+# Import demo data for cloud deployment
+try:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    import demo_data
+    DEMO_MODE_AVAILABLE = True
+except ImportError:
+    DEMO_MODE_AVAILABLE = False
+
 # Get the absolute path to the database_connector.py file
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
@@ -227,100 +235,53 @@ def get_database_connection():
     the DatabaseConnector class. It's cached to prevent multiple connections
     being created during dashboard interaction.
     
+    For cloud deployment, it falls back to demo mode if database connection fails.
+    
     Returns:
-        DatabaseConnector: An active database connection object
+        DatabaseConnector or str: An active database connection object or "demo_mode"
     """
-    import os
-    
-    # Detect Streamlit Cloud environment more robustly
-    is_streamlit_cloud = any([
-        'STREAMLIT_SHARING' in os.environ,
-        'IS_STREAMLIT_CLOUD' in os.environ,
-        os.path.exists('/mount/src'),  # Streamlit Cloud specific path
-        os.environ.get('HOSTNAME', '').startswith('ip-'),
-        'streamlit.app' in os.environ.get('HOSTNAME', ''),
-        '/mount/src' in os.getcwd(),  # Another Streamlit Cloud indicator
-    ])
-    
-    # Check for explicit demo mode
-    demo_mode = os.environ.get('DEMO_MODE', 'false').lower() == 'true'
-    
-    # Force demo mode if on Streamlit Cloud
-    if is_streamlit_cloud:
-        demo_mode = True
-        st.sidebar.info("🌐 Running on Streamlit Cloud with demo data")
-    
-    # Always use demo mode first on cloud platforms
-    if demo_mode or is_streamlit_cloud:
-        try:
-            # Try different import paths for the demo data provider
-            try:
-                from scripts.demo_data_provider import DemoDataProvider
-            except ImportError:
-                # If running from dashboard directory, try parent directory
-                import sys
-                import os
-                sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                from scripts.demo_data_provider import DemoDataProvider
-            
-            st.sidebar.success("✅ Using demo data provider")
-            return DemoDataProvider()
-        except Exception as demo_error:
-            st.error(f"❌ Failed to initialize demo data: {str(demo_error)}")
-            st.error(f"Current working directory: {os.getcwd()}")
-            st.error(f"Python path: {sys.path}")
-            st.stop()
-    
-    # Only try database connection if explicitly not in demo mode and not on Streamlit Cloud
+    # Try to get database parameters from Streamlit secrets first
     try:
-        # Import configuration settings with fallback
-        try:
-            from config import DB_CONFIG
-            db_params = DB_CONFIG
-        except ImportError:
-            db_params = {
-                'dbname': os.environ.get('DB_NAME', 'seller_analytics'),
-                'user': os.environ.get('DB_USER', 'postgres'),
-                'password': os.environ.get('DB_PASSWORD', 'postgres'),
-                'host': os.environ.get('DB_HOST', 'localhost'),
-                'port': int(os.environ.get('DB_PORT', '5432'))
-            }
-        
+        db_params = {
+            'dbname': st.secrets.get("database", {}).get("dbname", "seller_analytics"),
+            'user': st.secrets.get("database", {}).get("user", "postgres"),
+            'password': st.secrets.get("database", {}).get("password", "postgres"),
+            'host': st.secrets.get("database", {}).get("host", "localhost"),
+            'port': st.secrets.get("database", {}).get("port", 5432)
+        }
+    except:
+        # Fallback to default values for local development
+        db_params = {
+            'dbname': 'seller_analytics',
+            'user': 'postgres',
+            'password': 'postgres',
+            'host': 'localhost',
+            'port': 5432
+        }
+    
+    # Try to connect to the database
+    try:
         db = DatabaseConnector(db_params)
         connection_successful = db.connect()
         
         if not connection_successful:
-            st.warning("⚠️ Database connection failed. Switching to demo mode.")
-            try:
-                try:
-                    from scripts.demo_data_provider import DemoDataProvider
-                except ImportError:
-                    import sys
-                    import os
-                    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                    from scripts.demo_data_provider import DemoDataProvider
-                return DemoDataProvider()
-            except Exception as demo_error:
-                st.error(f"❌ Failed to initialize demo data after database failure: {str(demo_error)}")
-                st.stop()
+            st.warning("Could not connect to database. Running in demo mode with sample data.")
+            return "demo_mode"
         else:
-            st.sidebar.success("✅ Database connected successfully")
-        
-        return db
-    except Exception as e:
-        st.warning(f"⚠️ Database error: {str(e)}. Using demo data instead.")
-        try:
+            # Test the connection by running a simple query
             try:
-                from scripts.demo_data_provider import DemoDataProvider
-            except ImportError:
-                import sys
-                import os
-                sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                from scripts.demo_data_provider import DemoDataProvider
-            return DemoDataProvider()
-        except Exception as demo_error:
-            st.error(f"❌ Failed to initialize demo data: {str(demo_error)}")
-            st.stop()
+                test_result = db.get_date_range()
+                if test_result.empty:
+                    st.warning("Database connected but no data found. Running in demo mode with sample data.")
+                    return "demo_mode"
+                st.sidebar.success("Database connection established successfully")
+                return db
+            except Exception as test_error:
+                st.warning(f"Database connection test failed: {str(test_error)}. Running in demo mode with sample data.")
+                return "demo_mode"
+    except Exception as e:
+        st.warning(f"Database connection failed: {str(e)}. Running in demo mode with sample data.")
+        return "demo_mode"
 
 # Load data with caching
 # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
@@ -333,30 +294,48 @@ def load_initial_data(_db):
     Results are cached for one hour to improve performance.
     
     Args:
-        _db: DatabaseConnector instance or DemoDataProvider with active connection
+        _db: DatabaseConnector instance with active connection or "demo_mode"
         
     Returns:
         dict: Dictionary containing date range, locations, categories, and sellers
     """
-    try:
+    if _db == "demo_mode":
+        # Use demo data
         data = {
-            'date_range': _db.get_date_range(),
-            'locations': _db.get_locations(),
-            'categories': _db.get_categories(),
-            'sellers': _db.get_all_sellers()
+            'date_range': demo_data.get_demo_date_range(),
+            'locations': demo_data.get_demo_locations(),
+            'categories': demo_data.get_demo_categories(),
+            'sellers': demo_data.generate_demo_sellers()
         }
-        
-        # No widgets here to avoid CachedWidgetWarning
-        return data
-    except Exception as e:
-        st.error(f"Error loading initial data: {str(e)}")
-        # Return empty structures as fallback
-        return {
-            'date_range': pd.DataFrame([{'min_date': datetime.now() - timedelta(days=365), 'max_date': datetime.now()}]),
-            'locations': pd.DataFrame({'seller_location': ['Default Location']}),
-            'categories': pd.DataFrame({'product_category': ['Default Category']}),
-            'sellers': pd.DataFrame({'seller_id': [0], 'seller_name': ['Default Seller']})
-        }
+    else:
+        # Try to use real database data, fallback to demo if it fails
+        try:
+            data = {
+                'date_range': _db.get_date_range(),
+                'locations': _db.get_locations(),
+                'categories': _db.get_categories(),
+                'sellers': _db.get_all_sellers()
+            }
+            
+            # Check if any data is empty and fallback to demo mode
+            if (data['date_range'].empty or data['locations'].empty or 
+                data['categories'].empty or data['sellers'].empty):
+                st.warning("Database returned empty data. Using demo data instead.")
+                data = {
+                    'date_range': demo_data.get_demo_date_range(),
+                    'locations': demo_data.get_demo_locations(),
+                    'categories': demo_data.get_demo_categories(),
+                    'sellers': demo_data.generate_demo_sellers()
+                }
+        except Exception as e:
+            st.warning(f"Database error: {str(e)}. Using demo data instead.")
+            data = {
+                'date_range': demo_data.get_demo_date_range(),
+                'locations': demo_data.get_demo_locations(),
+                'categories': demo_data.get_demo_categories(),
+                'sellers': demo_data.generate_demo_sellers()
+            }
+    return data
 
 # Load KPI data with filters
 # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
@@ -370,18 +349,28 @@ def load_kpi_data(_db, filters=None):
     but will refresh when filter parameters change.
     
     Args:
-        _db: DatabaseConnector instance with active connection
+        _db: DatabaseConnector instance with active connection or "demo_mode"
         filters: Dictionary of filter parameters (date range, location, category, etc.)
         
     Returns:
         DataFrame: KPI data for filtered sellers
     """
-    # Convert filters to a hashable string for better caching
-    # Including the timestamp in the filter hash to ensure fresh data on page reloads
-    # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
-    filter_str = str(sorted((filters or {}).items())) + str(datetime.now().minute)
-    # Get the data with filters
-    return _db.get_seller_kpi_dashboard(filters)
+    if _db == "demo_mode":
+        # Use demo data and apply basic filtering
+        kpi_data = demo_data.generate_demo_kpi_data()
+        
+        # Apply basic filters for demo
+        if filters:
+            if 'location' in filters:
+                kpi_data = kpi_data[kpi_data['seller_location'] == filters['location']]
+            if 'seller_id' in filters:
+                kpi_data = kpi_data[kpi_data['seller_id'] == filters['seller_id']]
+        
+        return kpi_data
+    else:
+        # Use real database data
+        filter_str = str(sorted((filters or {}).items())) + str(datetime.now().minute)
+        return _db.get_seller_kpi_dashboard(filters)
 
 # Load top sellers data with filters
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -394,14 +383,30 @@ def load_top_sellers(_db, limit=10, filters=None):
     when filter parameters change.
     
     Args:
-        _db: DatabaseConnector instance with active connection
+        _db: DatabaseConnector instance with active connection or "demo_mode"
         limit: Maximum number of top sellers to retrieve
         filters: Dictionary of filter parameters (date range, location, category, etc.)
         
     Returns:
         DataFrame: Top sellers data sorted by revenue
     """
-    return _db.get_top_sellers_by_revenue(limit, filters)
+    if _db == "demo_mode":
+        # Use demo data
+        kpi_data = demo_data.generate_demo_kpi_data()
+        
+        # Apply basic filters for demo
+        if filters:
+            if 'location' in filters:
+                kpi_data = kpi_data[kpi_data['seller_location'] == filters['location']]
+            if 'seller_id' in filters:
+                kpi_data = kpi_data[kpi_data['seller_id'] == filters['seller_id']]
+        
+        # Sort by revenue and return top N
+        top_sellers = kpi_data.nlargest(limit, 'total_revenue')
+        return top_sellers[['seller_id', 'seller_name', 'total_revenue', 'total_orders']]
+    else:
+        # Use real database data
+        return _db.get_top_sellers_by_revenue(limit, filters)
 
 # Load monthly trend data with filters
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -410,14 +415,27 @@ def load_monthly_trend(_db, seller_id=None, filters=None):
     Load monthly trend data with optional filters
     
     Args:
-        _db: DatabaseConnector instance
+        _db: DatabaseConnector instance or "demo_mode"
         seller_id: Specific seller to focus on (optional)
         filters: Dictionary of filter parameters
         
     Returns:
         DataFrame: Monthly sales trend data
     """
-    return _db.get_monthly_sales_trend(seller_id, filters)
+    if _db == "demo_mode":
+        # Use demo data
+        monthly_data = demo_data.generate_demo_monthly_trend()
+        
+        # Apply seller filter if specified
+        if seller_id:
+            monthly_data = monthly_data[monthly_data['seller_id'] == seller_id]
+        elif filters and 'seller_id' in filters:
+            monthly_data = monthly_data[monthly_data['seller_id'] == filters['seller_id']]
+        
+        return monthly_data
+    else:
+        # Use real database data
+        return _db.get_monthly_sales_trend(seller_id, filters)
 
 # Load order status distribution with filters
 # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
@@ -427,14 +445,19 @@ def load_order_status(_db, seller_id=None, filters=None):
     Load order status distribution with optional filters
     
     Args:
-        _db: DatabaseConnector instance
+        _db: DatabaseConnector instance or "demo_mode"
         seller_id: Specific seller to focus on (optional)
         filters: Dictionary of filter parameters
         
     Returns:
         DataFrame: Order status distribution data
     """
-    return _db.get_order_status_distribution(seller_id, filters)
+    if _db == "demo_mode":
+        # Use demo data
+        return demo_data.generate_demo_order_status()
+    else:
+        # Use real database data
+        return _db.get_order_status_distribution(seller_id, filters)
 
 # Load ratings vs returns data with filters
 # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
@@ -444,25 +467,40 @@ def load_ratings_returns(_db, filters=None):
     Load ratings vs returns data with optional filters
     
     Args:
-        _db: DatabaseConnector instance
+        _db: DatabaseConnector instance or "demo_mode"
         filters: Dictionary of filter parameters
         
     Returns:
         DataFrame: Correlation data between ratings and return rates
     """
-    return _db.get_ratings_returns_correlation(filters)
+    if _db == "demo_mode":
+        # Use demo data
+        return demo_data.generate_demo_ratings_returns()
+    else:
+        # Use real database data
+        return _db.get_ratings_returns_correlation(filters)
 
 # Load seller breakdown data
 @st.cache_data(ttl=3600)
 def load_seller_breakdown(_db, seller_id, start_date=None, end_date=None):
     """Load comprehensive seller breakdown data"""
-    return _db.get_full_seller_breakdown(seller_id, start_date, end_date)
+    if _db == "demo_mode":
+        # Use demo data
+        return demo_data.generate_demo_seller_breakdown(seller_id)
+    else:
+        # Use real database data
+        return _db.get_full_seller_breakdown(seller_id, start_date, end_date)
 
 # Load export data with filters
 @st.cache_data(ttl=3600)
 def load_export_data(_db, filters=None):
     """Load data for export with optional filters"""
-    return _db.get_filtered_data_for_export(filters)
+    if _db == "demo_mode":
+        # Use demo data for export
+        return demo_data.generate_demo_kpi_data()
+    else:
+        # Use real database data
+        return _db.get_filtered_data_for_export(filters)
 
 # Function to create a download link for dataframes
 def get_download_link(df, filename, text):
@@ -1036,51 +1074,13 @@ def display_seller_breakdown(seller_breakdown):
             else:
                 st.info("No return data available for this seller.")
 
-# Import the DemoDataProvider for type checking
-try:
-    from scripts.demo_data_provider import DemoDataProvider
-except ImportError:
-    # If running from dashboard directory, try parent directory
-    import sys
-    import os
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    try:
-        from scripts.demo_data_provider import DemoDataProvider
-    except ImportError:
-        # Define a dummy class for type checking if import fails
-        class DemoDataProvider:
-            pass
-
 # Main function
 def main():
     # Initialize database connection
     db = get_database_connection()
     
-    # Debug mode checkbox in sidebar (moved from cached function to here)
-    debug_mode = st.sidebar.checkbox("Debug Mode", False)
-    # Store debug mode in session state for other parts of the app to access
-    st.session_state['debug_mode'] = debug_mode
-    
-    # Check if we're using the demo data provider
-    is_demo = isinstance(db, DemoDataProvider)
-    if is_demo:
-        st.session_state['is_demo_mode'] = True
-    
     # Load initial data
-    try:
-        initial_data = load_initial_data(_db=db)
-    except Exception as e:
-        st.error(f"Error loading initial data: {str(e)}")
-        st.stop()
-    
-    # Display debug information if requested
-    if debug_mode:
-        st.sidebar.write("Data structure types:")
-        st.sidebar.write("Date range type:", type(initial_data['date_range']))
-        st.sidebar.write("Locations type:", type(initial_data['locations']))
-        st.sidebar.write("Categories type:", type(initial_data['categories']))
-        st.sidebar.write("Sellers type:", type(initial_data['sellers']))
-        st.sidebar.write("Using demo mode:", st.session_state.get('is_demo_mode', False))
+    initial_data = load_initial_data(_db=db)
     
     # Title and description
     st.markdown('''
@@ -1094,79 +1094,90 @@ def main():
     st.sidebar.header("Filters")
     
     # Date range filter
-    if not initial_data['date_range'].empty:
-        min_date = initial_data['date_range'].iloc[0]['min_date']
-        max_date = initial_data['date_range'].iloc[0]['max_date']
-        
-        # Default to last 3 months if data range is large enough
-        default_start = max_date - timedelta(days=90) if max_date - timedelta(days=90) > min_date else min_date
+    try:
+        if not initial_data['date_range'].empty and 'min_date' in initial_data['date_range'].columns:
+            min_date = initial_data['date_range'].iloc[0]['min_date']
+            max_date = initial_data['date_range'].iloc[0]['max_date']
+            
+            # Default to last 3 months if data range is large enough
+            default_start = max_date - timedelta(days=90) if max_date - timedelta(days=90) > min_date else min_date
+            
+            start_date = st.sidebar.date_input(
+                "Start Date",
+                value=default_start,
+                min_value=min_date,
+                max_value=max_date
+            )
+            
+            end_date = st.sidebar.date_input(
+                "End Date",
+                value=max_date,
+                min_value=min_date,
+                max_value=max_date
+            )
+            
+            # Ensure start_date <= end_date
+            # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
+            if start_date > end_date:
+                st.sidebar.error("Start date cannot be after end date.")
+                start_date = end_date
+        else:
+            # Fallback to reasonable defaults if no date range data
+            default_end = datetime.now().date()
+            default_start = default_end - timedelta(days=90)
+            
+            start_date = st.sidebar.date_input(
+                "Start Date",
+                value=default_start
+            )
+            
+            end_date = st.sidebar.date_input(
+                "End Date", 
+                value=default_end
+            )
+    except Exception as e:
+        # Fallback to reasonable defaults if there's any error
+        default_end = datetime.now().date()
+        default_start = default_end - timedelta(days=90)
         
         start_date = st.sidebar.date_input(
             "Start Date",
-            value=default_start,
-            min_value=min_date,
-            max_value=max_date
+            value=default_start
         )
         
         end_date = st.sidebar.date_input(
-            "End Date",
-            value=max_date,
-            min_value=min_date,
-            max_value=max_date
+            "End Date", 
+            value=default_end
         )
-        
-        # Ensure start_date <= end_date
-        # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
-        if start_date > end_date:
-            st.sidebar.error("Start date cannot be after end date.")
-            start_date = end_date
-    else:
-        start_date = None
-        end_date = None
     
     # Location filter
-    # Fix for accessing locations data structure, works with both database connector and demo provider
-    if isinstance(initial_data['locations'], pd.DataFrame) and 'seller_location' in initial_data['locations'].columns:
-        # Demo data provider returns a DataFrame with a seller_location column
-        location_options = ['All Locations'] + initial_data['locations']['seller_location'].tolist()
-    elif isinstance(initial_data['locations'], dict) and 'seller_location' in initial_data['locations']:
-        # Database connector might return a dict with a seller_location key
-        location_options = ['All Locations'] + initial_data['locations']['seller_location']
-    else:
-        # Fallback if structure is unexpected
+    try:
+        if 'seller_location' in initial_data['locations'].columns and len(initial_data['locations']) > 0:
+            location_options = ['All Locations'] + initial_data['locations']['seller_location'].tolist()
+        else:
+            location_options = ['All Locations']
+    except:
         location_options = ['All Locations']
-        st.warning("Could not load location options. Some filters may not work correctly.")
-    
     selected_location = st.sidebar.selectbox("Seller Location", location_options)
     
     # Category filter
-    # Fix for accessing categories data structure, works with both database connector and demo provider
-    if isinstance(initial_data['categories'], pd.DataFrame) and 'product_category' in initial_data['categories'].columns:
-        # Demo data provider returns a DataFrame with a product_category column
-        category_options = ['All Categories'] + initial_data['categories']['product_category'].tolist()
-    elif isinstance(initial_data['categories'], dict) and 'product_category' in initial_data['categories']:
-        # Database connector might return a dict with a product_category key
-        category_options = ['All Categories'] + initial_data['categories']['product_category']
-    else:
-        # Fallback if structure is unexpected
+    try:
+        if 'product_category' in initial_data['categories'].columns and len(initial_data['categories']) > 0:
+            category_options = ['All Categories'] + initial_data['categories']['product_category'].tolist()
+        else:
+            category_options = ['All Categories']
+    except:
         category_options = ['All Categories']
-        st.warning("Could not load category options. Some filters may not work correctly.")
-    
     selected_category = st.sidebar.selectbox("Product Category", category_options)
     
     # Seller filter
-    # Fix for accessing sellers data structure, works with both database connector and demo provider
-    if isinstance(initial_data['sellers'], pd.DataFrame) and 'seller_name' in initial_data['sellers'].columns:
-        # Demo data provider returns a DataFrame with seller columns
-        seller_options = ['All Sellers'] + initial_data['sellers']['seller_name'].tolist()
-    elif isinstance(initial_data['sellers'], dict) and 'seller_name' in initial_data['sellers']:
-        # Database connector might return a dict with a seller_name key
-        seller_options = ['All Sellers'] + initial_data['sellers']['seller_name']
-    else:
-        # Fallback if structure is unexpected
+    try:
+        if 'seller_name' in initial_data['sellers'].columns and len(initial_data['sellers']) > 0:
+            seller_options = ['All Sellers'] + initial_data['sellers']['seller_name'].tolist()
+        else:
+            seller_options = ['All Sellers']
+    except:
         seller_options = ['All Sellers']
-        st.warning("Could not load seller options. Some filters may not work correctly.")
-        
     selected_seller = st.sidebar.selectbox("Seller", seller_options)
     
     # Create filters dictionary
@@ -1185,28 +1196,17 @@ def main():
         filters['category'] = selected_category
     
     if selected_seller != 'All Sellers':
-        # Get seller_id for the selected seller, with error handling for different data structures
+        # Get seller_id for the selected seller
+        # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
         try:
-            if isinstance(initial_data['sellers'], pd.DataFrame):
-                # For DataFrame structure
-                seller_row = initial_data['sellers'][initial_data['sellers']['seller_name'] == selected_seller]
-                if not seller_row.empty:
-                    seller_id = seller_row['seller_id'].iloc[0]
+            if 'seller_id' in initial_data['sellers'].columns and len(initial_data['sellers']) > 0:
+                seller_matches = initial_data['sellers'][initial_data['sellers']['seller_name'] == selected_seller]
+                if len(seller_matches) > 0:
+                    seller_id = seller_matches['seller_id'].iloc[0]
                     filters['seller_id'] = seller_id
-                else:
-                    st.warning(f"Could not find seller ID for {selected_seller}")
-            elif isinstance(initial_data['sellers'], dict) and 'seller_name' in initial_data['sellers']:
-                # For dictionary structure
-                seller_names = initial_data['sellers']['seller_name']
-                seller_ids = initial_data['sellers']['seller_id']
-                if selected_seller in seller_names:
-                    idx = seller_names.index(selected_seller)
-                    filters['seller_id'] = seller_ids[idx]
-                else:
-                    st.warning(f"Could not find seller ID for {selected_seller}")
-        except Exception as e:
-            st.error(f"Error finding seller ID: {str(e)}")
-            # Continue without setting seller_id filter
+        except:
+            # If there's an error getting seller_id, just skip it
+            pass
     
     # Store filters in session state to detect changes
     # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
@@ -1226,8 +1226,8 @@ def main():
         # Add a key to session state to track the filter change
         st.session_state['filter_change_count'] = st.session_state.get('filter_change_count', 0) + 1
         
-    # Display session state for debugging (use session state value instead of another checkbox)
-    if st.session_state.get('debug_mode', False):
+    # Display session state for debugging
+    if st.sidebar.checkbox("Debug Mode", False):
         st.sidebar.write("Current filters:", filters)
         st.sidebar.write("Filters changed:", filters_changed)
         st.sidebar.write("Filter change count:", st.session_state.get('filter_change_count', 0))
@@ -1381,7 +1381,15 @@ def main():
         "Use the filters to explore different segments of the data and gain actionable insights."
     )
     # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
-    st.sidebar.markdown(f"Data range: {min_date if 'min_date' in locals() else 'N/A'} to {max_date if 'max_date' in locals() else 'N/A'}")
+    try:
+        if not initial_data['date_range'].empty and 'min_date' in initial_data['date_range'].columns:
+            min_date_display = initial_data['date_range'].iloc[0]['min_date']
+            max_date_display = initial_data['date_range'].iloc[0]['max_date']
+            st.sidebar.markdown(f"Data range: {min_date_display} to {max_date_display}")
+        else:
+            st.sidebar.markdown("Data range: Demo data")
+    except:
+        st.sidebar.markdown("Data range: Demo data")
 
 if __name__ == "__main__":
     main()

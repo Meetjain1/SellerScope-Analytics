@@ -1,22 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
-Streamlit app entry point for the Seller Performance Analytics Dashboard
-This file is used to run the dashboard from the root directory.
+streamlit_app.py - Entry point for the Seller Performance Analytics Dashboard
+
+This is the main entry point for the Streamlit Community Cloud deployment.
+It imports and runs the main dashboard application.
+
+Created by: Meet Jain
 """
 
-# Import necessary modules
-import os
 import sys
+import os
 
-# Add the project root to the path so we can import from dashboard/
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add the current directory to the Python path to ensure proper imports
+sys.path.append(os.path.dirname(__file__))
 
-# Force demo mode for cloud deployments early in the process
-os.environ['DEMO_MODE'] = 'true'
-os.environ['IS_STREAMLIT_CLOUD'] = 'true'
-
-# Import and run the dashboard app
+# Import the main dashboard application
 from dashboard.app import main
 
-# Run the main function
 if __name__ == "__main__":
+    # Run the main dashboard application
     main()
