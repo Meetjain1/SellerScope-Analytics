@@ -297,13 +297,7 @@ def load_initial_data(_db):
             'sellers': _db.get_all_sellers()
         }
         
-        # Log data structure for debugging
-        if st.sidebar.checkbox("Debug Mode", False):
-            st.sidebar.write("Date range type:", type(data['date_range']))
-            st.sidebar.write("Locations type:", type(data['locations']))
-            st.sidebar.write("Categories type:", type(data['categories']))
-            st.sidebar.write("Sellers type:", type(data['sellers']))
-        
+        # No widgets here to avoid CachedWidgetWarning
         return data
     except Exception as e:
         st.error(f"Error loading initial data: {str(e)}")
@@ -998,8 +992,21 @@ def main():
     # Initialize database connection
     db = get_database_connection()
     
+    # Debug mode checkbox in sidebar (moved from cached function to here)
+    debug_mode = st.sidebar.checkbox("Debug Mode", False)
+    # Store debug mode in session state for other parts of the app to access
+    st.session_state['debug_mode'] = debug_mode
+    
     # Load initial data
     initial_data = load_initial_data(_db=db)
+    
+    # Display debug information if requested
+    if debug_mode:
+        st.sidebar.write("Data structure types:")
+        st.sidebar.write("Date range type:", type(initial_data['date_range']))
+        st.sidebar.write("Locations type:", type(initial_data['locations']))
+        st.sidebar.write("Categories type:", type(initial_data['categories']))
+        st.sidebar.write("Sellers type:", type(initial_data['sellers']))
     
     # Title and description
     st.markdown('''
@@ -1145,8 +1152,8 @@ def main():
         # Add a key to session state to track the filter change
         st.session_state['filter_change_count'] = st.session_state.get('filter_change_count', 0) + 1
         
-    # Display session state for debugging
-    if st.sidebar.checkbox("Debug Mode", False):
+    # Display session state for debugging (use session state value instead of another checkbox)
+    if st.session_state.get('debug_mode', False):
         st.sidebar.write("Current filters:", filters)
         st.sidebar.write("Filters changed:", filters_changed)
         st.sidebar.write("Filter change count:", st.session_state.get('filter_change_count', 0))
