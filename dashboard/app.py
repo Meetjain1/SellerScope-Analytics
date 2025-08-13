@@ -253,11 +253,22 @@ def get_database_connection():
     # Always use demo mode first on cloud platforms
     if demo_mode or is_streamlit_cloud:
         try:
-            from scripts.demo_data_provider import DemoDataProvider
+            # Try different import paths for the demo data provider
+            try:
+                from scripts.demo_data_provider import DemoDataProvider
+            except ImportError:
+                # If running from dashboard directory, try parent directory
+                import sys
+                import os
+                sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                from scripts.demo_data_provider import DemoDataProvider
+            
             st.sidebar.success("✅ Using demo data provider")
             return DemoDataProvider()
         except Exception as demo_error:
             st.error(f"❌ Failed to initialize demo data: {str(demo_error)}")
+            st.error(f"Current working directory: {os.getcwd()}")
+            st.error(f"Python path: {sys.path}")
             st.stop()
     
     # Only try database connection if explicitly not in demo mode and not on Streamlit Cloud
@@ -281,7 +292,13 @@ def get_database_connection():
         if not connection_successful:
             st.warning("⚠️ Database connection failed. Switching to demo mode.")
             try:
-                from scripts.demo_data_provider import DemoDataProvider
+                try:
+                    from scripts.demo_data_provider import DemoDataProvider
+                except ImportError:
+                    import sys
+                    import os
+                    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                    from scripts.demo_data_provider import DemoDataProvider
                 return DemoDataProvider()
             except Exception as demo_error:
                 st.error(f"❌ Failed to initialize demo data after database failure: {str(demo_error)}")
@@ -293,7 +310,13 @@ def get_database_connection():
     except Exception as e:
         st.warning(f"⚠️ Database error: {str(e)}. Using demo data instead.")
         try:
-            from scripts.demo_data_provider import DemoDataProvider
+            try:
+                from scripts.demo_data_provider import DemoDataProvider
+            except ImportError:
+                import sys
+                import os
+                sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                from scripts.demo_data_provider import DemoDataProvider
             return DemoDataProvider()
         except Exception as demo_error:
             st.error(f"❌ Failed to initialize demo data: {str(demo_error)}")
@@ -1017,9 +1040,16 @@ def display_seller_breakdown(seller_breakdown):
 try:
     from scripts.demo_data_provider import DemoDataProvider
 except ImportError:
-    # Define a dummy class for type checking if import fails
-    class DemoDataProvider:
-        pass
+    # If running from dashboard directory, try parent directory
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    try:
+        from scripts.demo_data_provider import DemoDataProvider
+    except ImportError:
+        # Define a dummy class for type checking if import fails
+        class DemoDataProvider:
+            pass
 
 # Main function
 def main():
