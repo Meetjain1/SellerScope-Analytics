@@ -49,6 +49,9 @@ class DatabaseConnector:
         """Establish a connection to the database"""
         try:
             self.engine = create_engine(self.connection_string)
+            # Test the connection by executing a simple query
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
             logger.info("Database connection established successfully")
             return True
         except Exception as e:

@@ -230,64 +230,73 @@ def get_database_connection():
     Returns:
         DatabaseConnector: An active database connection object
     """
-    # Import configuration settings
-    try:
-        from config import DB_CONFIG, DEMO_MODE, IS_STREAMLIT_CLOUD
-        db_params = DB_CONFIG
-        demo_mode = DEMO_MODE
-    except ImportError:
-        # Fallback if config import fails
-        import os
-        db_params = {
-            'dbname': os.environ.get('DB_NAME', 'seller_analytics'),
-            'user': os.environ.get('DB_USER', 'postgres'),
-            'password': os.environ.get('DB_PASSWORD', 'postgres'),
-            'host': os.environ.get('DB_HOST', 'localhost'),
-            'port': int(os.environ.get('DB_PORT', '5432'))
-        }
-        demo_mode = os.environ.get('DEMO_MODE', 'false').lower() == 'true'
-        IS_STREAMLIT_CLOUD = os.environ.get('IS_STREAMLIT_CLOUD') or 'STREAMLIT_SHARING' in os.environ
+    import os
     
-    # Force demo mode in Streamlit Cloud environment
-    if IS_STREAMLIT_CLOUD:
+    # Detect Streamlit Cloud environment more robustly
+    is_streamlit_cloud = any([
+        'STREAMLIT_SHARING' in os.environ,
+        'IS_STREAMLIT_CLOUD' in os.environ,
+        os.path.exists('/mount/src'),  # Streamlit Cloud specific path
+        os.environ.get('HOSTNAME', '').startswith('ip-'),
+        'streamlit.app' in os.environ.get('HOSTNAME', ''),
+        '/mount/src' in os.getcwd(),  # Another Streamlit Cloud indicator
+    ])
+    
+    # Check for explicit demo mode
+    demo_mode = os.environ.get('DEMO_MODE', 'false').lower() == 'true'
+    
+    # Force demo mode if on Streamlit Cloud
+    if is_streamlit_cloud:
         demo_mode = True
-        st.sidebar.info("Running on Streamlit Cloud in demo mode")
+        st.sidebar.info("🌐 Running on Streamlit Cloud with demo data")
     
-    # Use DemoDataProvider in demo mode (or always for Streamlit Cloud)
-    if demo_mode:
+    # Always use demo mode first on cloud platforms
+    if demo_mode or is_streamlit_cloud:
         try:
             from scripts.demo_data_provider import DemoDataProvider
-            st.sidebar.success("Running in demo mode with sample data")
+            st.sidebar.success("✅ Using demo data provider")
             return DemoDataProvider()
         except Exception as demo_error:
-            st.error(f"Failed to initialize demo data: {str(demo_error)}")
+            st.error(f"❌ Failed to initialize demo data: {str(demo_error)}")
             st.stop()
     
-    # Only try database connection if not in demo mode
+    # Only try database connection if explicitly not in demo mode and not on Streamlit Cloud
     try:
+        # Import configuration settings with fallback
+        try:
+            from config import DB_CONFIG
+            db_params = DB_CONFIG
+        except ImportError:
+            db_params = {
+                'dbname': os.environ.get('DB_NAME', 'seller_analytics'),
+                'user': os.environ.get('DB_USER', 'postgres'),
+                'password': os.environ.get('DB_PASSWORD', 'postgres'),
+                'host': os.environ.get('DB_HOST', 'localhost'),
+                'port': int(os.environ.get('DB_PORT', '5432'))
+            }
+        
         db = DatabaseConnector(db_params)
         connection_successful = db.connect()
         
         if not connection_successful:
-            st.warning("Failed to connect to the database. Falling back to demo mode with sample data.")
+            st.warning("⚠️ Database connection failed. Switching to demo mode.")
             try:
                 from scripts.demo_data_provider import DemoDataProvider
                 return DemoDataProvider()
             except Exception as demo_error:
-                st.error(f"Failed to initialize demo data after database connection failed: {str(demo_error)}")
+                st.error(f"❌ Failed to initialize demo data after database failure: {str(demo_error)}")
                 st.stop()
         else:
-            # Log success for debugging
-            st.sidebar.success("Database connection established successfully")
+            st.sidebar.success("✅ Database connected successfully")
         
         return db
     except Exception as e:
-        st.warning(f"Could not connect to the database: {str(e)}. Using demo data instead.")
+        st.warning(f"⚠️ Database error: {str(e)}. Using demo data instead.")
         try:
             from scripts.demo_data_provider import DemoDataProvider
             return DemoDataProvider()
         except Exception as demo_error:
-            st.error(f"Failed to initialize demo data after database exception: {str(demo_error)}")
+            st.error(f"❌ Failed to initialize demo data: {str(demo_error)}")
             st.stop()
 
 # Load data with caching
