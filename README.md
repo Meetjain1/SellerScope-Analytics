@@ -145,69 +145,6 @@ The application leverages modern technologies to deliver a robust analytics solu
 4. **Seller Drill-down**: Select a specific seller to view detailed performance analytics
 5. **Data Export**: Use the export section to download data in CSV format
 
-## Setup Instructions
-
-### Deployment to Streamlit Cloud
-
-The dashboard is designed to be easily deployed to Streamlit Cloud:
-
-1. **Fork or Clone the Repository**
-   - Fork this repository to your GitHub account, or clone it and push to a new repository.
-
-2. **Connect to Streamlit Cloud**
-   - Go to [Streamlit Cloud](https://streamlit.io/cloud) and sign in with your GitHub account.
-   - Click "New app" and select your repository.
-   - Set the main file path to either `streamlit_app.py` or `dashboard/app.py`.
-   - Under "Advanced settings", add the following:
-     - Set environment variable `DEMO_MODE` to `true`
-
-3. **Deploy**
-   - Click "Deploy" and wait for the build to complete.
-   - The app will run in demo mode with generated sample data.
-
-4. **Optional Database Configuration**
-   - To use a real PostgreSQL database, set these environment variables:
-     - `DB_HOST`: Your database host
-     - `DB_NAME`: Database name
-     - `DB_USER`: Database username
-     - `DB_PASSWORD`: Database password
-     - `DB_PORT`: Database port (default 5432)
-     - `DEMO_MODE`: Set to `false`
-
-### Local Setup
-
-To run the dashboard locally:
-
-1. **Clone the Repository**
-   ```bash
-   git clone <repository-url>
-   cd Seller\ Performance\ Analytics\ Dashboard
-   ```
-
-2. **Create a Virtual Environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Run the Dashboard in Demo Mode**
-   ```bash
-   DEMO_MODE=true streamlit run dashboard/app.py
-   ```
-
-5. **Optional: Configure a Database**
-   - Set up a PostgreSQL database and update the connection parameters in `dashboard/app.py` or use environment variables as mentioned in the Deployment section.
-   - Use the SQL scripts in the `sql/` directory to create the necessary tables and views.
-   - To run with a database:
-     ```bash
-     streamlit run dashboard/app.py
-     ```
-
 ## KPIs and Metrics
 
 The dashboard calculates the following key performance indicators:
@@ -460,4 +397,4 @@ The Seller Performance Analytics Dashboard has a roadmap for continued improveme
    - Move from daily to near real-time data processing
    - Implement streaming data pipeline for live updates
    - Add alerting for significant performance changes
-
+   

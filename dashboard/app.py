@@ -284,18 +284,36 @@ def load_initial_data(_db):
     Results are cached for one hour to improve performance.
     
     Args:
-        _db: DatabaseConnector instance with active connection
+        _db: DatabaseConnector instance or DemoDataProvider with active connection
         
     Returns:
         dict: Dictionary containing date range, locations, categories, and sellers
     """
-    data = {
-        'date_range': _db.get_date_range(),
-        'locations': _db.get_locations(),
-        'categories': _db.get_categories(),
-        'sellers': _db.get_all_sellers()
-    }
-    return data
+    try:
+        data = {
+            'date_range': _db.get_date_range(),
+            'locations': _db.get_locations(),
+            'categories': _db.get_categories(),
+            'sellers': _db.get_all_sellers()
+        }
+        
+        # Log data structure for debugging
+        if st.sidebar.checkbox("Debug Mode", False):
+            st.sidebar.write("Date range type:", type(data['date_range']))
+            st.sidebar.write("Locations type:", type(data['locations']))
+            st.sidebar.write("Categories type:", type(data['categories']))
+            st.sidebar.write("Sellers type:", type(data['sellers']))
+        
+        return data
+    except Exception as e:
+        st.error(f"Error loading initial data: {str(e)}")
+        # Return empty structures as fallback
+        return {
+            'date_range': pd.DataFrame([{'min_date': datetime.now() - timedelta(days=365), 'max_date': datetime.now()}]),
+            'locations': pd.DataFrame({'seller_location': ['Default Location']}),
+            'categories': pd.DataFrame({'product_category': ['Default Category']}),
+            'sellers': pd.DataFrame({'seller_id': [0], 'seller_name': ['Default Seller']})
+        }
 
 # Load KPI data with filters
 # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
@@ -1026,15 +1044,48 @@ def main():
         end_date = None
     
     # Location filter
-    location_options = ['All Locations'] + initial_data['locations']['seller_location'].tolist()
+    # Fix for accessing locations data structure, works with both database connector and demo provider
+    if isinstance(initial_data['locations'], pd.DataFrame) and 'seller_location' in initial_data['locations'].columns:
+        # Demo data provider returns a DataFrame with a seller_location column
+        location_options = ['All Locations'] + initial_data['locations']['seller_location'].tolist()
+    elif isinstance(initial_data['locations'], dict) and 'seller_location' in initial_data['locations']:
+        # Database connector might return a dict with a seller_location key
+        location_options = ['All Locations'] + initial_data['locations']['seller_location']
+    else:
+        # Fallback if structure is unexpected
+        location_options = ['All Locations']
+        st.warning("Could not load location options. Some filters may not work correctly.")
+    
     selected_location = st.sidebar.selectbox("Seller Location", location_options)
     
     # Category filter
-    category_options = ['All Categories'] + initial_data['categories']['product_category'].tolist()
+    # Fix for accessing categories data structure, works with both database connector and demo provider
+    if isinstance(initial_data['categories'], pd.DataFrame) and 'product_category' in initial_data['categories'].columns:
+        # Demo data provider returns a DataFrame with a product_category column
+        category_options = ['All Categories'] + initial_data['categories']['product_category'].tolist()
+    elif isinstance(initial_data['categories'], dict) and 'product_category' in initial_data['categories']:
+        # Database connector might return a dict with a product_category key
+        category_options = ['All Categories'] + initial_data['categories']['product_category']
+    else:
+        # Fallback if structure is unexpected
+        category_options = ['All Categories']
+        st.warning("Could not load category options. Some filters may not work correctly.")
+    
     selected_category = st.sidebar.selectbox("Product Category", category_options)
     
     # Seller filter
-    seller_options = ['All Sellers'] + initial_data['sellers']['seller_name'].tolist()
+    # Fix for accessing sellers data structure, works with both database connector and demo provider
+    if isinstance(initial_data['sellers'], pd.DataFrame) and 'seller_name' in initial_data['sellers'].columns:
+        # Demo data provider returns a DataFrame with seller columns
+        seller_options = ['All Sellers'] + initial_data['sellers']['seller_name'].tolist()
+    elif isinstance(initial_data['sellers'], dict) and 'seller_name' in initial_data['sellers']:
+        # Database connector might return a dict with a seller_name key
+        seller_options = ['All Sellers'] + initial_data['sellers']['seller_name']
+    else:
+        # Fallback if structure is unexpected
+        seller_options = ['All Sellers']
+        st.warning("Could not load seller options. Some filters may not work correctly.")
+        
     selected_seller = st.sidebar.selectbox("Seller", seller_options)
     
     # Create filters dictionary
@@ -1053,10 +1104,28 @@ def main():
         filters['category'] = selected_category
     
     if selected_seller != 'All Sellers':
-        # Get seller_id for the selected seller
-        # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
-        seller_id = initial_data['sellers'][initial_data['sellers']['seller_name'] == selected_seller]['seller_id'].iloc[0]
-        filters['seller_id'] = seller_id
+        # Get seller_id for the selected seller, with error handling for different data structures
+        try:
+            if isinstance(initial_data['sellers'], pd.DataFrame):
+                # For DataFrame structure
+                seller_row = initial_data['sellers'][initial_data['sellers']['seller_name'] == selected_seller]
+                if not seller_row.empty:
+                    seller_id = seller_row['seller_id'].iloc[0]
+                    filters['seller_id'] = seller_id
+                else:
+                    st.warning(f"Could not find seller ID for {selected_seller}")
+            elif isinstance(initial_data['sellers'], dict) and 'seller_name' in initial_data['sellers']:
+                # For dictionary structure
+                seller_names = initial_data['sellers']['seller_name']
+                seller_ids = initial_data['sellers']['seller_id']
+                if selected_seller in seller_names:
+                    idx = seller_names.index(selected_seller)
+                    filters['seller_id'] = seller_ids[idx]
+                else:
+                    st.warning(f"Could not find seller ID for {selected_seller}")
+        except Exception as e:
+            st.error(f"Error finding seller ID: {str(e)}")
+            # Continue without setting seller_id filter
     
     # Store filters in session state to detect changes
     # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
