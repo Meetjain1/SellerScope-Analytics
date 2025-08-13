@@ -27,14 +27,23 @@ class DatabaseConnector:
     def __init__(self, db_params=None):
         """Initialize the database connector with connection parameters"""
         self.db_params = db_params or {
-            'dbname': 'seller_analytics',
-            'user': 'postgres',
-            'password': 'postgres',
-            'host': 'localhost',
-            'port': 5432
+            'dbname': os.environ.get('DB_NAME', 'seller_analytics'),
+            'user': os.environ.get('DB_USER', 'postgres'),
+            'password': os.environ.get('DB_PASSWORD', 'postgres'),
+            'host': os.environ.get('DB_HOST', 'localhost'),
+            'port': int(os.environ.get('DB_PORT', '5432'))
         }
         self.engine = None
-        self.connection_string = f"postgresql://{self.db_params['user']}:{self.db_params['password']}@{self.db_params['host']}:{self.db_params['port']}/{self.db_params['dbname']}"
+        
+        # Check if we have a DATABASE_URL environment variable (used by many cloud platforms)
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url and database_url.startswith('postgres://'):
+            # Convert postgres:// to postgresql:// for SQLAlchemy
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+            self.connection_string = database_url
+        else:
+            # Create connection string from parameters
+            self.connection_string = f"postgresql://{self.db_params['user']}:{self.db_params['password']}@{self.db_params['host']}:{self.db_params['port']}/{self.db_params['dbname']}"
     
     def connect(self):
         """Establish a connection to the database"""

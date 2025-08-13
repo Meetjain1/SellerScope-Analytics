@@ -230,33 +230,48 @@ def get_database_connection():
     Returns:
         DatabaseConnector: An active database connection object
     """
+    # Get database connection parameters from environment variables or use defaults
+    import os
     db_params = {
-        'dbname': 'seller_analytics',
-        'user': 'postgres',
-        'password': 'postgres',
-        'host': 'localhost',
-        'port': 5432
+        'dbname': os.environ.get('DB_NAME', 'seller_analytics'),
+        'user': os.environ.get('DB_USER', 'postgres'),
+        'password': os.environ.get('DB_PASSWORD', 'postgres'),
+        'host': os.environ.get('DB_HOST', 'localhost'),
+        'port': int(os.environ.get('DB_PORT', '5432'))
     }
     
-    # Add debugging information
-    # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.
+    # Check for DEMO_MODE environment variable
+    import os
+    demo_mode = os.environ.get('DEMO_MODE', 'false').lower() == 'true'
+    
+    # Use DemoDataProvider in demo mode or when database connection fails
+    if demo_mode:
+        from scripts.demo_data_provider import DemoDataProvider
+        st.sidebar.success("Running in demo mode with sample data")
+        return DemoDataProvider()
+    
+    # Try to connect to the database
     try:
         db = DatabaseConnector(db_params)
         connection_successful = db.connect()
         
         if not connection_successful:
-            st.error("Failed to connect to the database. Please check your connection parameters.")
-            st.error(f"Connection parameters: {db_params}")
-            st.stop()
+            st.warning("Failed to connect to the database. Falling back to demo mode with sample data.")
+            from scripts.demo_data_provider import DemoDataProvider
+            return DemoDataProvider()
         else:
             # Log success for debugging
             st.sidebar.success("Database connection established successfully")
         
         return db
     except Exception as e:
-        st.error(f"Exception during database connection: {str(e)}")
-        st.error(f"Connection parameters: {db_params}")
-        st.stop()
+        st.warning(f"Could not connect to the database: {str(e)}. Using demo data instead.")
+        try:
+            from scripts.demo_data_provider import DemoDataProvider
+            return DemoDataProvider()
+        except Exception as demo_error:
+            st.error(f"Failed to initialize demo data: {str(demo_error)}")
+            st.stop()
 
 # Load data with caching
 # © 2025 Meet Jain | Project created by Meet Jain. Unauthorized copying or reproduction is prohibited.

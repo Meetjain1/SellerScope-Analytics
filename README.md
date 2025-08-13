@@ -4,14 +4,28 @@ A modern, interactive analytics platform for e-commerce marketplace administrato
 
 ![Seller Analytics Dashboard](https://via.placeholder.com/800x450.png?text=Seller+Analytics+Dashboard+Preview)
 
+## Live Demo
+
+Check out the live demo of this dashboard at:
+[https://sellerscope-analytics.streamlit.app](https://sellerscope-analytics.streamlit.app)
+
+The live demo runs in demo mode with generated sample data (no database required).
+
+## Live Demo
+
+Check out the live demo of this dashboard at:
+[https://sellerscope-analytics.streamlit.app](https://sellerscope-analytics.streamlit.app)
+
+The live demo runs in demo mode with generated sample data (no database required).
+
 ## Table of Contents
 - [Overview](#overview)
 - [Project Structure](#project-structure)
 - [Tech Stack](#tech-stack)
 - [Features](#features)
 - [Setup Instructions](#setup-instructions)
-  - [Quick Setup](#quick-setup)
-  - [Manual Setup](#manual-setup)
+  - [Deployment to Streamlit Cloud](#deployment-to-streamlit-cloud)
+  - [Local Setup](#local-setup)
 - [Using the Dashboard](#using-the-dashboard)
 - [KPIs and Metrics](#kpis-and-metrics)
 - [Data Analysis](#data-analysis)
@@ -46,15 +60,15 @@ Seller Performance Analytics Dashboard/
 │   ├── schema.sql                # Database schema definition with table structures
 │   └── kpi_queries.sql           # SQL views for efficient KPI calculations
 ├── scripts/                      # Utility scripts
-│   ├── data_generator.py         # Script for generating realistic synthetic data
-│   └── database_connector.py     # Database connection and query execution class
-├── analysis/                     # Data analysis components
-│   ├── seller_performance_analysis.ipynb  # Jupyter notebook for in-depth analysis
-│   └── business_insights_report.md        # Documented business insights and recommendations
-├── setup.sh                      # Automated environment and database setup script
-├── run.sh                        # Dashboard launch script with environment activation
+│   ├── database_connector.py     # Database connection and query execution class
+│   └── demo_data_provider.py     # Demo data provider for running without a database
+├── config.py                     # Configuration settings with environment variable support
+├── streamlit_app.py              # Entry point for Streamlit Cloud deployment
 ├── requirements.txt              # Python dependencies with version specifications
-├── CHECKLIST.md                  # Implementation status and feature tracking
+├── runtime.txt                   # Python runtime specification for deployment
+├── setup.sh                      # Streamlit Cloud setup script
+├── Procfile                      # Process file for Streamlit Cloud deployment
+├── .gitignore                    # Git ignore patterns
 └── README.md                     # Project documentation and user guide
 ```
 
@@ -85,6 +99,11 @@ The application leverages modern technologies to deliver a robust analytics solu
   - Git for version control
   - Faker library for generating realistic test data
   - Jupyter Notebook for exploratory data analysis
+
+- **Deployment**:
+  - Streamlit Cloud for hosting
+  - Environment variables for configuration
+  - Demo mode for database-less operation
 
 ## Features
 
@@ -125,6 +144,69 @@ The application leverages modern technologies to deliver a robust analytics solu
 3. **Visualizations**: Explore the various tabs for different visualization types
 4. **Seller Drill-down**: Select a specific seller to view detailed performance analytics
 5. **Data Export**: Use the export section to download data in CSV format
+
+## Setup Instructions
+
+### Deployment to Streamlit Cloud
+
+The dashboard is designed to be easily deployed to Streamlit Cloud:
+
+1. **Fork or Clone the Repository**
+   - Fork this repository to your GitHub account, or clone it and push to a new repository.
+
+2. **Connect to Streamlit Cloud**
+   - Go to [Streamlit Cloud](https://streamlit.io/cloud) and sign in with your GitHub account.
+   - Click "New app" and select your repository.
+   - Set the main file path to either `streamlit_app.py` or `dashboard/app.py`.
+   - Under "Advanced settings", add the following:
+     - Set environment variable `DEMO_MODE` to `true`
+
+3. **Deploy**
+   - Click "Deploy" and wait for the build to complete.
+   - The app will run in demo mode with generated sample data.
+
+4. **Optional Database Configuration**
+   - To use a real PostgreSQL database, set these environment variables:
+     - `DB_HOST`: Your database host
+     - `DB_NAME`: Database name
+     - `DB_USER`: Database username
+     - `DB_PASSWORD`: Database password
+     - `DB_PORT`: Database port (default 5432)
+     - `DEMO_MODE`: Set to `false`
+
+### Local Setup
+
+To run the dashboard locally:
+
+1. **Clone the Repository**
+   ```bash
+   git clone <repository-url>
+   cd Seller\ Performance\ Analytics\ Dashboard
+   ```
+
+2. **Create a Virtual Environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Run the Dashboard in Demo Mode**
+   ```bash
+   DEMO_MODE=true streamlit run dashboard/app.py
+   ```
+
+5. **Optional: Configure a Database**
+   - Set up a PostgreSQL database and update the connection parameters in `dashboard/app.py` or use environment variables as mentioned in the Deployment section.
+   - Use the SQL scripts in the `sql/` directory to create the necessary tables and views.
+   - To run with a database:
+     ```bash
+     streamlit run dashboard/app.py
+     ```
 
 ## KPIs and Metrics
 
@@ -378,5 +460,4 @@ The Seller Performance Analytics Dashboard has a roadmap for continued improveme
    - Move from daily to near real-time data processing
    - Implement streaming data pipeline for live updates
    - Add alerting for significant performance changes
-
 
